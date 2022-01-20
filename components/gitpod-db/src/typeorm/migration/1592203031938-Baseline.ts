@@ -5,26 +5,8 @@
  */
 
 import { MigrationInterface, QueryRunner } from "typeorm";
-import * as crypto from "crypto";
-import { v4 as uuidv4 } from 'uuid';
 
 import { BUILTIN_WORKSPACE_PROBE_USER_ID } from "../../user-db";
-
-// From encryption-key.json
-const encryption_key = "4uGh1q8y2DYryJwrVMHs0kWXJlqvHWWt/KJuNi04edI=";
-
-function encrypt(data: string, key: Buffer) {
-    const iv = crypto.randomBytes(16);
-    const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
-    const encrypted = cipher.update(new Buffer(data, 'utf8'));
-    const finalEncrypted = Buffer.concat([encrypted, cipher.final()]);
-    return {
-        data: finalEncrypted.toString('base64'),
-        keyParams: {
-            iv: iv.toString('base64')
-        }
-    };
-}
 
 export class Baseline1592203031938 implements MigrationInterface {
 
@@ -97,31 +79,9 @@ export class Baseline1592203031938 implements MigrationInterface {
 
         // probe user
         {
-            const existsUser = (await queryRunner.query(`SELECT COUNT(1) AS cnt FROM d_b_user WHERE id = 'builtin-user-workspace-probe-0000000'`))[0].cnt == 1;
-            if (!existsUser) {
+            const exists = (await queryRunner.query(`SELECT COUNT(1) AS cnt FROM d_b_user WHERE id = 'builtin-user-workspace-probe-0000000'`))[0].cnt == 1;
+            if (!exists) {
                 await queryRunner.query(`INSERT IGNORE INTO d_b_user (id, creationDate, avatarUrl, name, fullName) VALUES ('${BUILTIN_WORKSPACE_PROBE_USER_ID}', '${new Date().toISOString()}', '', 'builtin-workspace-prober', '')`)
-            }
-            const existsIdentity = (await queryRunner.query(`SELECT COUNT(1) AS cnt FROM d_b_identity WHERE userId = 'builtin-user-workspace-probe-0000000'`))[0].cnt == 1;
-            if (!existsIdentity) {
-                await queryRunner.query(`INSERT IGNORE INTO d_b_identity (authProviderId, authId, authName, userId, tokens) VALUES ('Public-GitHub', '12345678', 'builtin-workspace-prober', 'builtin-user-workspace-probe-0000000', '[]')`)
-            }
-            const existsToken = (await queryRunner.query(`SELECT COUNT(1) AS cnt FROM d_b_token_entry WHERE authId = '12345678'`))[0].cnt == 1;
-            if (!existsToken) {
-                const encriptedData = encrypt(
-                    JSON.stringify(JSON.stringify({
-                        value: '',
-                        scopes: []
-                    })),
-                    new Buffer(encryption_key, 'base64')
-                );
-                const token = JSON.stringify({
-                    ...encriptedData,
-                    keyMetadata: {
-                        name: "general",
-                        version: 1
-                    }
-                });
-                await queryRunner.query(`INSERT IGNORE INTO d_b_token_entry (authProviderId, authId, token, uid) VALUES ('Public-GitHub', '12345678', '${token}', '${uuidv4()}')`)
             }
         }
     }

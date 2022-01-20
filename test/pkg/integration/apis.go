@@ -123,38 +123,36 @@ type ForwardPort struct {
 	RemotePort int32
 }
 
-type KeyParams struct {
-	Iv string
+type EncriptedDBData struct {
+	Data      string `json:"data"`
+	KeyParams struct {
+		Iv string `json:"iv"`
+	} `json:"keyParams"`
+	KeyMetadata struct {
+		Name    string `json:"name"`
+		Version int    `json:"version"`
+	} `json:"keyMetadata"`
 }
 
-type EncryptedData struct {
-	Data      string
-	KeyParams KeyParams
-}
-
-func EncryptValue(value []byte, key []byte) *EncryptedData {
+func EncryptValue(value []byte, key []byte) (data string, iv string) {
 	PKCS5Padding := func(ciphertext []byte, blockSize int, after int) []byte {
 		padding := (blockSize - len(ciphertext)%blockSize)
 		padtext := bytes.Repeat([]byte{byte(padding)}, padding)
 		return append(ciphertext, padtext...)
 	}
 
-	iv := []byte("1234567890123456")
+	iv = "1234567890123456"
 
 	block, _ := aes.NewCipher(key)
-	mode := cipher.NewCBCEncrypter(block, iv)
+	mode := cipher.NewCBCEncrypter(block, []byte(iv))
 
 	paddedValue := PKCS5Padding(value, aes.BlockSize, len(value))
 	ciphertext := make([]byte, len(paddedValue))
 	mode.CryptBlocks(ciphertext, paddedValue)
 
-	returnVal := EncryptedData{
-		Data: base64.StdEncoding.EncodeToString(ciphertext),
-		KeyParams: KeyParams{
-			Iv: base64.StdEncoding.EncodeToString(iv),
-		},
-	}
-	return &returnVal
+	data = base64.StdEncoding.EncodeToString(ciphertext)
+
+	return
 }
 
 // Supervisor provides a gRPC connection to a workspace's supervisor
@@ -355,6 +353,101 @@ func (c *ComponentAPI) GetUserId(user string) (userId string, err error) {
 	return id, nil
 }
 
+func (c *ComponentAPI) CreateUser(userId string, token string) error {
+	dbConfig, err := FindDBConfigFromPodEnv("server", c.namespace, c.client)
+	if err != nil {
+		return err
+	}
+
+	db, err := c.DB()
+	if err != nil {
+		return err
+	}
+
+	var exist string
+	err = db.QueryRow(`SELECT COUNT(1) AS cnt FROM d_b_user WHERE id = ?`, userId).Scan(&exist)
+	if err != nil && err != sql.ErrNoRows {
+		return err
+	}
+
+	_, err = db.Exec(`INSERT IGNORE INTO d_b_user (id, creationDate, avatarUrl, name, fullName) VALUES (?, ?, ?, ?, ?)`,
+		userId,
+		time.Now().Format(time.RFC3339),
+		"",
+		"integration_test_user",
+		"",
+	)
+	if err != nil {
+		return err
+	}
+
+	err = db.QueryRow(`SELECT COUNT(1) AS cnt FROM d_b_identity WHERE userId = ?`, userId).Scan(&exist)
+	if err != nil && err != sql.ErrNoRows {
+		return err
+	}
+
+	_, err = db.Exec(`INSERT IGNORE INTO d_b_identity (authProviderId, authId, authName, userId, tokens) VALUES (?, ?, ?, ?, ?)`,
+		"Public-GitHub",
+		"12345678",
+		"integration_test_user",
+		userId,
+		"[]",
+	)
+	if err != nil {
+		return err
+	}
+
+	err = db.QueryRow(`SELECT COUNT(1) AS cnt FROM d_b_token_entry WHERE authId = ?`, "12345678").Scan(&exist)
+	if err != nil && err != sql.ErrNoRows {
+		return err
+	}
+
+	uid, err := uuid.NewRandom()
+	if err != nil {
+		return err
+	}
+
+	// Double Marshalling to be compatible with EncryptionServiceImpl
+	value := struct {
+		Value  string `json:"value"`
+		Scopes []string `json:"scopes"`
+	}{
+		Value:  token,
+		Scopes: []string{},
+	}
+	valueBytes, err := json.Marshal(value)
+	if err != nil {
+		return err
+	}
+	valueBytes2, err := json.Marshal(string(valueBytes))
+	if err != nil {
+		return err
+	}
+
+	encryptedData, iv := EncryptValue(valueBytes2, dbConfig.EncryptionKeys.Material)
+	encrypted := EncriptedDBData{}
+	encrypted.Data = encryptedData
+	encrypted.KeyParams.Iv = iv
+	encrypted.KeyMetadata.Name = dbConfig.EncryptionKeys.Metadata.Name
+	encrypted.KeyMetadata.Version = dbConfig.EncryptionKeys.Metadata.Version
+	encryptedJson, err := json.Marshal(encrypted)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec(`INSERT IGNORE INTO d_b_token_entry (authProviderId, authId, token, uid) VALUES (?, ?, ?, ?)`,
+		"Public-GitHub",
+		"12345678",
+		encryptedJson,
+		uid.String(),
+	)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (c *ComponentAPI) createGitpodToken(user string) (tkn string, err error) {
 	id, err := c.GetUserId(user)
 	if err != nil {
@@ -425,20 +518,10 @@ func (c *ComponentAPI) CreateGitpodOneTimeSecret(value string) (id string, err e
 		return "", err
 	}
 
-	type EncriptedDBData struct {
-		Data      string `json:"data"`
-		KeyParams struct {
-			Iv string `json:"iv"`
-		} `json:"keyParams"`
-		KeyMetadata struct {
-			Name    string `json:"name"`
-			Version int    `json:"version"`
-		} `json:"keyMetadata"`
-	}
-	encryptedData := EncryptValue(valueBytes2, dbConfig.EncryptionKeys.Material)
+	encryptedData, iv := EncryptValue(valueBytes2, dbConfig.EncryptionKeys.Material)
 	encrypted := EncriptedDBData{}
-	encrypted.Data = encryptedData.Data
-	encrypted.KeyParams.Iv = encryptedData.KeyParams.Iv
+	encrypted.Data = encryptedData
+	encrypted.KeyParams.Iv = iv
 	encrypted.KeyMetadata.Name = dbConfig.EncryptionKeys.Metadata.Name
 	encrypted.KeyMetadata.Version = dbConfig.EncryptionKeys.Metadata.Version
 	encryptedJson, err := json.Marshal(encrypted)
