@@ -409,7 +409,7 @@ func (c *ComponentAPI) CreateUser(userId string, token string) error {
 
 	// Double Marshalling to be compatible with EncryptionServiceImpl
 	value := struct {
-		Value  string `json:"value"`
+		Value  string   `json:"value"`
 		Scopes []string `json:"scopes"`
 	}{
 		Value:  token,
