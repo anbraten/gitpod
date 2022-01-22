@@ -141,16 +141,17 @@ func EncryptValue(value []byte, key []byte) (data string, iv string) {
 		return append(ciphertext, padtext...)
 	}
 
-	iv = "1234567890123456"
+	ivData := []byte("1234567890123456")
 
 	block, _ := aes.NewCipher(key)
-	mode := cipher.NewCBCEncrypter(block, []byte(iv))
+	mode := cipher.NewCBCEncrypter(block, ivData)
 
 	paddedValue := PKCS5Padding(value, aes.BlockSize, len(value))
 	ciphertext := make([]byte, len(paddedValue))
 	mode.CryptBlocks(ciphertext, paddedValue)
 
 	data = base64.StdEncoding.EncodeToString(ciphertext)
+	iv = base64.StdEncoding.EncodeToString(ivData)
 
 	return
 }
@@ -353,7 +354,7 @@ func (c *ComponentAPI) GetUserId(user string) (userId string, err error) {
 	return id, nil
 }
 
-func (c *ComponentAPI) CreateUser(userId string, token string) error {
+func (c *ComponentAPI) CreateUser(username string, userId string, token string) error {
 	dbConfig, err := FindDBConfigFromPodEnv("server", c.namespace, c.client)
 	if err != nil {
 		return err
@@ -364,85 +365,92 @@ func (c *ComponentAPI) CreateUser(userId string, token string) error {
 		return err
 	}
 
-	var exist string
-	err = db.QueryRow(`SELECT COUNT(1) AS cnt FROM d_b_user WHERE id = ?`, userId).Scan(&exist)
-	if err != nil && err != sql.ErrNoRows {
-		return err
-	}
-
-	_, err = db.Exec(`INSERT IGNORE INTO d_b_user (id, creationDate, avatarUrl, name, fullName) VALUES (?, ?, ?, ?, ?)`,
-		userId,
-		time.Now().Format(time.RFC3339),
-		"",
-		"integration_test_user",
-		"",
-	)
+	var cnt int
+	err = db.QueryRow(`SELECT COUNT(1) AS cnt FROM d_b_user WHERE id = ?`, userId).Scan(&cnt)
 	if err != nil {
 		return err
 	}
-
-	err = db.QueryRow(`SELECT COUNT(1) AS cnt FROM d_b_identity WHERE userId = ?`, userId).Scan(&exist)
-	if err != nil && err != sql.ErrNoRows {
-		return err
+	if cnt == 0 {
+		_, err = db.Exec(`INSERT IGNORE INTO d_b_user (id, creationDate, avatarUrl, name, fullName) VALUES (?, ?, ?, ?, ?)`,
+			userId,
+			time.Now().Format(time.RFC3339),
+			"",
+			username,
+			username,
+		)
+		if err != nil {
+			return err
+		}
 	}
 
-	_, err = db.Exec(`INSERT IGNORE INTO d_b_identity (authProviderId, authId, authName, userId, tokens) VALUES (?, ?, ?, ?, ?)`,
-		"Public-GitHub",
-		"12345678",
-		"integration_test_user",
-		userId,
-		"[]",
-	)
+	err = db.QueryRow(`SELECT COUNT(1) AS cnt FROM d_b_identity WHERE userId = ?`, userId).Scan(&cnt)
 	if err != nil {
 		return err
 	}
-
-	err = db.QueryRow(`SELECT COUNT(1) AS cnt FROM d_b_token_entry WHERE authId = ?`, "12345678").Scan(&exist)
-	if err != nil && err != sql.ErrNoRows {
-		return err
+	if cnt == 0 {
+		_, err = db.Exec(`INSERT IGNORE INTO d_b_identity (authProviderId, authId, authName, userId, tokens) VALUES (?, ?, ?, ?, ?)`,
+			"Public-GitHub",
+			"12345678",
+			username,
+			userId,
+			"[]",
+		)
+		if err != nil {
+			return err
+		}
 	}
 
-	uid, err := uuid.NewRandom()
+	err = db.QueryRow(`SELECT COUNT(1) AS cnt FROM d_b_token_entry WHERE authId = ?`, "12345678").Scan(&cnt)
 	if err != nil {
 		return err
 	}
+	if cnt == 0 {
+		err = func() error {
+			uid, err := uuid.NewRandom()
+			if err != nil {
+				return err
+			}
 
-	// Double Marshalling to be compatible with EncryptionServiceImpl
-	value := struct {
-		Value  string   `json:"value"`
-		Scopes []string `json:"scopes"`
-	}{
-		Value:  token,
-		Scopes: []string{},
-	}
-	valueBytes, err := json.Marshal(value)
-	if err != nil {
-		return err
-	}
-	valueBytes2, err := json.Marshal(string(valueBytes))
-	if err != nil {
-		return err
-	}
+			// Double Marshalling to be compatible with EncryptionServiceImpl
+			value := struct {
+				Value  string   `json:"value"`
+				Scopes []string `json:"scopes"`
+			}{
+				Value:  token,
+				Scopes: []string{},
+			}
+			valueBytes, err := json.Marshal(value)
+			if err != nil {
+				return err
+			}
+			valueBytes2, err := json.Marshal(string(valueBytes))
+			if err != nil {
+				return err
+			}
 
-	encryptedData, iv := EncryptValue(valueBytes2, dbConfig.EncryptionKeys.Material)
-	encrypted := EncriptedDBData{}
-	encrypted.Data = encryptedData
-	encrypted.KeyParams.Iv = iv
-	encrypted.KeyMetadata.Name = dbConfig.EncryptionKeys.Metadata.Name
-	encrypted.KeyMetadata.Version = dbConfig.EncryptionKeys.Metadata.Version
-	encryptedJson, err := json.Marshal(encrypted)
-	if err != nil {
-		return err
-	}
+			encryptedData, iv := EncryptValue(valueBytes2, dbConfig.EncryptionKeys.Material)
+			encrypted := EncriptedDBData{}
+			encrypted.Data = encryptedData
+			encrypted.KeyParams.Iv = iv
+			encrypted.KeyMetadata.Name = dbConfig.EncryptionKeys.Metadata.Name
+			encrypted.KeyMetadata.Version = dbConfig.EncryptionKeys.Metadata.Version
+			encryptedJson, err := json.Marshal(encrypted)
+			if err != nil {
+				return err
+			}
 
-	_, err = db.Exec(`INSERT IGNORE INTO d_b_token_entry (authProviderId, authId, token, uid) VALUES (?, ?, ?, ?)`,
-		"Public-GitHub",
-		"12345678",
-		encryptedJson,
-		uid.String(),
-	)
-	if err != nil {
-		return err
+			_, err = db.Exec(`INSERT IGNORE INTO d_b_token_entry (authProviderId, authId, token, uid) VALUES (?, ?, ?, ?)`,
+				"Public-GitHub",
+				"12345678",
+				encryptedJson,
+				uid.String(),
+			)
+
+			return err
+		}()
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
