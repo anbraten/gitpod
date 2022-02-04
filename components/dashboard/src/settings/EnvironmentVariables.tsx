@@ -5,14 +5,15 @@
  */
 
 import { UserEnvVarValue } from "@gitpod/gitpod-protocol";
-import { useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import ConfirmationModal from "../components/ConfirmationModal";
 import { Item, ItemField, ItemFieldContextMenu, ItemsList } from "../components/ItemsList";
 import Modal from "../components/Modal";
 import { PageWithSubMenu } from "../components/PageWithSubMenu";
 import { getGitpodService } from "../service/service";
-import settingsMenu from "./settings-menu";
+import getSettingsMenu from "./settings-menu";
 import CodeText from "../components/CodeText";
+import { PaymentContext } from "../payment-context";
 
 interface EnvVarModalProps {
     envVar: UserEnvVarValue;
@@ -108,6 +109,7 @@ function sortEnvVars(a: UserEnvVarValue, b: UserEnvVarValue) {
 }
 
 export default function EnvVars() {
+    const { showPaymentUI } = useContext(PaymentContext);
     const [envVars, setEnvVars] = useState([] as UserEnvVarValue[]);
     const [currentEnvVar, setCurrentEnvVar] = useState({ name: '', value: '', repositoryPattern: '' } as UserEnvVarValue);
     const [isAddEnvVarModalVisible, setAddEnvVarModalVisible] = useState(false);
@@ -181,7 +183,7 @@ export default function EnvVars() {
         return '';
     };
 
-    return <PageWithSubMenu subMenu={settingsMenu} title='Variables' subtitle='Configure environment variables for all workspaces.'>
+    return <PageWithSubMenu subMenu={getSettingsMenu({ showPaymentUI })} title='Variables' subtitle='Configure environment variables for all workspaces.'>
         {isAddEnvVarModalVisible && <AddEnvVarModal
             save={save}
             envVar={currentEnvVar}

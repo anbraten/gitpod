@@ -5,10 +5,9 @@
  */
 
 import React, { useState, useEffect, useContext } from "react";
-import { countries } from 'countries-list';
 import { AccountStatement, Subscription, UserPaidSubscription, AssignedTeamSubscription, CreditDescription } from "@gitpod/gitpod-protocol/lib/accounting-protocol";
 import { PlanCoupon, GithubUpgradeURL } from "@gitpod/gitpod-protocol/lib/payment-protocol";
-import { Plans, Plan, Currency, PlanType } from "@gitpod/gitpod-protocol/lib/plans";
+import { Plans, Plan, PlanType } from "@gitpod/gitpod-protocol/lib/plans";
 import { ChargebeeClient } from "../chargebee/chargebee-client";
 import AlertBox from "../components/AlertBox";
 import InfoBox from "../components/InfoBox";
@@ -18,7 +17,8 @@ import { getGitpodService } from "../service/service";
 import { UserContext } from "../user-context";
 import { PageWithSubMenu } from "../components/PageWithSubMenu";
 import Tooltip from "../components/Tooltip";
-import settingsMenu from "./settings-menu";
+import getSettingsMenu from "./settings-menu";
+import { PaymentContext } from "../payment-context";
 
 type PlanWithOriginalPrice = Plan & { originalPrice?: number };
 type Pending = { pendingSince: number };
@@ -36,11 +36,8 @@ type TeamClaimModal = {
 
 export default function () {
     const { user } = useContext(UserContext);
-    const [ showPaymentUI, setShowPaymentUI ] = useState<boolean>(false);
+    const { showPaymentUI, currency, setCurrency, isStudent, isChargebeeCustomer } = useContext(PaymentContext);
     const [ accountStatement, setAccountStatement ] = useState<AccountStatement>();
-    const [ isChargebeeCustomer, setIsChargebeeCustomer ] = useState<boolean>();
-    const [ isStudent, setIsStudent ] = useState<boolean>();
-    const [ currency, setCurrency ] = useState<Currency>('USD');
     const [ availableCoupons, setAvailableCoupons ] = useState<PlanCoupon[]>();
     const [ appliedCoupons, setAppliedCoupons ] = useState<PlanCoupon[]>();
     const [ gitHubUpgradeUrls, setGitHubUpgradeUrls ] = useState<GithubUpgradeURL[]>();
@@ -52,14 +49,7 @@ export default function () {
     useEffect(() => {
         const { server } = getGitpodService();
         Promise.all([
-            server.getShowPaymentUI().then(v => () => setShowPaymentUI(v)),
             server.getAccountStatement({}).then(v => () => setAccountStatement(v)),
-            server.isChargebeeCustomer().then(v => () => setIsChargebeeCustomer(v)),
-            server.isStudent().then(v => () => setIsStudent(v)),
-            server.getClientRegion().then(v => () => {
-                // @ts-ignore
-                setCurrency(countries[v]?.currency === 'EUR' ? 'EUR' : 'USD');
-            }),
             server.getAvailableCoupons().then(v => () => setAvailableCoupons(v)),
             server.getAppliedCoupons().then(v => () => setAppliedCoupons(v)),
             server.getGithubUpgradeUrls().then(v => () => setGitHubUpgradeUrls(v))
@@ -425,7 +415,7 @@ export default function () {
     }
 
     return <div>
-        <PageWithSubMenu subMenu={settingsMenu}  title='Plans' subtitle='Manage account usage and billing.'>
+        <PageWithSubMenu subMenu={getSettingsMenu({ showPaymentUI })} title='Plans' subtitle='Manage account usage and billing.'>
             {showPaymentUI && <div className="w-full text-center">
                 <p className="text-xl text-gray-500">You are currently using the <span className="font-bold">{Plans.getById(assignedTs?.planId)?.name || currentPlan.name}</span> plan.</p>
                 {!assignedTs && (

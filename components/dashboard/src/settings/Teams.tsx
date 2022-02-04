@@ -4,8 +4,7 @@
  * See License-AGPL.txt in the project root for license information.
  */
 
-import React, { useEffect, useRef, useState } from "react";
-import { countries } from 'countries-list';
+import React, { useContext, useEffect, useRef, useState } from "react";
 import ContextMenu, { ContextMenuEntry } from "../components/ContextMenu";
 import { PageWithSubMenu } from "../components/PageWithSubMenu";
 import { getGitpodService } from "../service/service";
@@ -18,13 +17,15 @@ import copy from '../images/copy.svg';
 import exclamation from '../images/exclamation.svg';
 import { ErrorCodes } from "@gitpod/gitpod-protocol/lib/messaging/error";
 import { poll, PollOptions } from "../utils";
-import settingsMenu from "./settings-menu";
+import getSettingsMenu from "./settings-menu";
 import { Disposable } from "@gitpod/gitpod-protocol";
+import { PaymentContext } from "../payment-context";
 
 export default function Teams() {
+    const { showPaymentUI } = useContext(PaymentContext);
 
     return (<div>
-        <PageWithSubMenu subMenu={settingsMenu} title='Teams' subtitle='View and manage subscriptions for your team with one centralized billing.'>
+        <PageWithSubMenu subMenu={getSettingsMenu({ showPaymentUI })} title='Teams' subtitle='View and manage subscriptions for your team with one centralized billing.'>
             <AllTeams />
         </PageWithSubMenu>
     </div>);
@@ -36,13 +37,9 @@ interface Slot extends TeamSubscriptionSlotResolved {
 }
 
 function AllTeams() {
-
-    const [defaultCurrency, setDefaultCurrency] = useState<string>("USD");
+    const { showPaymentUI, currency, isStudent, isChargebeeCustomer, setIsChargebeeCustomer } = useContext(PaymentContext);
 
     const [slots, setSlots] = useState<Slot[]>([]);
-    const [showPaymentUI, setShowPaymentUI] = useState<boolean>(false);
-    const [isChargebeeCustomer, setIsChargebeeCustomer] = useState<boolean>(false);
-    const [isStudent, setIsStudent] = useState<boolean>(false);
     const [teamSubscriptions, setTeamSubscriptions] = useState<TeamSubscription[]>([]);
 
     const [createTeamModal, setCreateTeamModal] = useState<{ types: string[], defaultCurrency: string } | undefined>(undefined);
@@ -117,19 +114,12 @@ function AllTeams() {
 
     const queryState = async () => {
         try {
-            const [slots, showPaymentUI, teamSubscriptions, clientRegion, isStudent] = await Promise.all([
+            const [slots, teamSubscriptions] = await Promise.all([
                 getGitpodService().server.tsGetSlots(),
-                getGitpodService().server.getShowPaymentUI(),
                 getGitpodService().server.tsGet(),
-                getGitpodService().server.getClientRegion(),
-                getGitpodService().server.isStudent(),
             ]);
 
-            setDefaultCurrency((clientRegion && (countries as any)[clientRegion]?.currency === 'EUR') ? 'EUR' : 'USD');
-            setIsStudent(isStudent);
-
             setSlots(slots);
-            setShowPaymentUI(showPaymentUI);
             setTeamSubscriptions(teamSubscriptions);
         } catch (error) {
             console.log(error);
@@ -400,7 +390,7 @@ function AllTeams() {
     const showCreateTeamModal = () => {
         const types = getAvailableSubTypes();
         if (types && types.length > 0) {
-            setCreateTeamModal({ types, defaultCurrency })
+            setCreateTeamModal({ types, defaultCurrency: currency })
         }
     }
 

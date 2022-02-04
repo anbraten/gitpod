@@ -16,16 +16,18 @@ import Modal from "../components/Modal";
 import { PageWithSubMenu } from "../components/PageWithSubMenu";
 import copy from '../images/copy.svg';
 import exclamation from '../images/exclamation.svg';
+import { PaymentContext } from "../payment-context";
 import { openAuthorizeWindow } from "../provider-utils";
 import { getGitpodService, gitpodHostUrl } from "../service/service";
 import { UserContext } from "../user-context";
 import { SelectAccountModal } from "./SelectAccountModal";
-import settingsMenu from "./settings-menu";
+import getSettingsMenu from "./settings-menu";
 
 export default function Integrations() {
+    const { showPaymentUI } = useContext(PaymentContext);
 
     return (<div>
-        <PageWithSubMenu subMenu={settingsMenu} title='Integrations' subtitle='Manage permissions for Git providers and integrations.'>
+        <PageWithSubMenu subMenu={getSettingsMenu({ showPaymentUI })} title='Integrations' subtitle='Manage permissions for Git providers and integrations.'>
             <GitProviders />
             <div className="h-12"></div>
             <GitIntegrations />
@@ -35,7 +37,6 @@ export default function Integrations() {
 
 
 function GitProviders() {
-
     const { user, setUser } = useContext(UserContext);
 
     const [authProviders, setAuthProviders] = useState<AuthProviderInfo[]>([]);

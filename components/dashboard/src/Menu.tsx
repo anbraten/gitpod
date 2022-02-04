@@ -15,7 +15,7 @@ import CaretUpDown from "./icons/CaretUpDown.svg";
 import { getGitpodService, gitpodHostUrl } from "./service/service";
 import { UserContext } from "./user-context";
 import { TeamsContext, getCurrentTeam } from "./teams/teams-context";
-import settingsMenu from './settings/settings-menu';
+import getSettingsMenu from './settings/settings-menu';
 import { adminMenu } from './admin/admin-menu';
 import ContextMenu from "./components/ContextMenu";
 import Separator from "./components/Separator";
@@ -24,6 +24,7 @@ import TabMenuItem from "./components/TabMenuItem";
 import { getTeamSettingsMenu } from "./teams/TeamSettings";
 import { getProjectSettingsMenu } from "./projects/ProjectSettings";
 import { ProjectContext } from "./projects/project-context";
+import { PaymentContext } from "./payment-context";
 
 interface Entry {
     title: string,
@@ -36,18 +37,19 @@ export default function Menu() {
     const { teams } = useContext(TeamsContext);
     const location = useLocation();
     const team = getCurrentTeam(location, teams);
+    const { showPaymentUI } = useContext(PaymentContext);
     const { project, setProject } = useContext(ProjectContext);
 
     const match = useRouteMatch<{ segment1?: string, segment2?: string, segment3?: string }>("/(t/)?:segment1/:segment2?/:segment3?");
     const projectSlug = (() => {
         const resource = match?.params?.segment2;
-        if (resource && !["projects", "members", "users", "workspaces", "settings"].includes(resource)) {
+        if (resource && ![/* team sub-pages */ "projects", "members", "settings", /* admin sub-pages */ "users", "workspaces"].includes(resource)) {
             return resource;
         }
     })();
     const prebuildId = (() => {
         const resource = projectSlug && match?.params?.segment3;
-        if (resource !== "workspaces" && resource !== "prebuilds" && resource !== "settings" && resource !== "configure" && resource !== "variables") {
+        if (resource && ![/* project sub-pages */ "prebuilds", "settings", "configure", "variables"].includes(resource)) {
             return resource;
         }
     })();
@@ -166,7 +168,7 @@ export default function Menu() {
             {
                 title: 'Settings',
                 link: '/settings',
-                alternatives: settingsMenu.flatMap(e => e.link)
+                alternatives: getSettingsMenu({ showPaymentUI }).flatMap(e => e.link)
             }
         ];
     })();

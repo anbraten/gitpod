@@ -9,10 +9,12 @@ import { getGitpodService } from "../service/service";
 import { UserContext } from "../user-context";
 import CheckBox from "../components/CheckBox";
 import { PageWithSubMenu } from "../components/PageWithSubMenu";
-import settingsMenu from "./settings-menu";
+import getSettingsMenu from "./settings-menu";
+import { PaymentContext } from "../payment-context";
 
 export default function Notifications() {
     const { user, setUser } = useContext(UserContext);
+    const { showPaymentUI } = useContext(PaymentContext);
     const [isOnboardingMail, setOnboardingMail] = useState(!!user?.additionalData?.emailNotificationSettings?.allowsOnboardingMail);
     const [isChangelogMail, setChangelogMail] = useState(!!user?.additionalData?.emailNotificationSettings?.allowsChangelogMail);
     const [isDevXMail, setDevXMail] = useState(!!user?.additionalData?.emailNotificationSettings?.allowsDevXMail);
@@ -82,7 +84,7 @@ export default function Notifications() {
 
     return (
     <div>
-        <PageWithSubMenu subMenu={settingsMenu} title='Notifications' subtitle='Choose when to be notified.'>
+        <PageWithSubMenu subMenu={getSettingsMenu({ showPaymentUI })} title='Notifications' subtitle='Choose when to be notified.'>
             <h3>Email Notification Preferences</h3>
             <CheckBox
                 title="Account Notifications [required]"
