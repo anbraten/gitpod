@@ -20,6 +20,17 @@ export interface TeamSubscription {
     deleted?: boolean;
 }
 
+export interface TeamSubscription2 {
+    id: string;
+    teamId: string;
+    planId: string;
+    startDate: string;
+    endDate?: string;
+    /** The Chargebee subscription id */
+    paymentReference: string;
+    cancellationDate?: string;
+}
+
 export namespace TeamSubscription {
     export const create = (ts: Omit<TeamSubscription, 'id'>): TeamSubscription => {
         const withId = ts as TeamSubscription;

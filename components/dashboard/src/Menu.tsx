@@ -43,7 +43,7 @@ export default function Menu() {
     const match = useRouteMatch<{ segment1?: string, segment2?: string, segment3?: string }>("/(t/)?:segment1/:segment2?/:segment3?");
     const projectSlug = (() => {
         const resource = match?.params?.segment2;
-        if (resource && ![/* team sub-pages */ "projects", "members", "settings", /* admin sub-pages */ "users", "workspaces"].includes(resource)) {
+        if (resource && ![/* team sub-pages */ "projects", "members", "settings", "plans", /* admin sub-pages */ "users", "workspaces"].includes(resource)) {
             return resource;
         }
     })();
@@ -148,7 +148,7 @@ export default function Menu() {
                 teamSettingsList.push({
                     title: 'Settings',
                     link: `/t/${team.slug}/settings`,
-                    alternatives: getTeamSettingsMenu(team).flatMap(e => e.link),
+                    alternatives: getTeamSettingsMenu({ team, showPaymentUI }).flatMap(e => e.link),
                 })
             }
 

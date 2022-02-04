@@ -11,6 +11,7 @@ import { TeamSubscription, TeamSubscriptionSlot } from "@gitpod/gitpod-protocol/
 
 import { TeamSubscriptionDB } from "../team-subscription-db";
 import { DBTeamSubscription } from "./entity/db-team-subscription";
+import { DBTeamSubscription2 } from "./entity/db-team-subscription-2";
 import { DBTeamSubscriptionSlot } from "./entity/db-team-subscription-slot";
 import { TypeORM } from "./typeorm";
 
@@ -31,6 +32,10 @@ export class TeamSubscriptionDBImpl implements TeamSubscriptionDB {
 
     protected async getRepo(): Promise<Repository<DBTeamSubscription>> {
         return (await this.getEntityManager()).getRepository(DBTeamSubscription);
+    }
+
+    protected async getRepo2(): Promise<Repository<DBTeamSubscription2>> {
+        return (await this.getEntityManager()).getRepository(DBTeamSubscription2);
     }
 
     protected async getSlotsRepo(): Promise<Repository<DBTeamSubscriptionSlot>> {

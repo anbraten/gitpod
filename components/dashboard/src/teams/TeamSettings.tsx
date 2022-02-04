@@ -10,16 +10,24 @@ import { Redirect, useLocation } from "react-router";
 import CodeText from "../components/CodeText";
 import ConfirmationModal from "../components/ConfirmationModal";
 import { PageWithSubMenu } from "../components/PageWithSubMenu";
+import { PaymentContext } from "../payment-context";
 import { getGitpodService, gitpodHostUrl } from "../service/service";
 import { UserContext } from "../user-context";
 import { getCurrentTeam, TeamsContext } from "./teams-context";
 
-export function getTeamSettingsMenu(team?: Team) {
+export function getTeamSettingsMenu(params: { team?: Team, showPaymentUI?: boolean }) {
+    const { team, showPaymentUI } = params;
     return [
         {
             title: 'General',
             link: [`/t/${team?.slug}/settings`],
         },
+        ...(showPaymentUI ? [
+            {
+                title: 'Paid Plans',
+                link: [`/t/${team?.slug}/plans`],
+            },
+        ] : []),
     ];
 }
 
@@ -31,6 +39,7 @@ export default function TeamSettings() {
     const { user } = useContext(UserContext);
     const location = useLocation();
     const team = getCurrentTeam(location, teams);
+    const { showPaymentUI } = useContext(PaymentContext);
 
     const close = () => setModal(false);
 
@@ -55,7 +64,7 @@ export default function TeamSettings() {
     };
 
     return <>
-        <PageWithSubMenu subMenu={getTeamSettingsMenu(team)} title="Settings" subtitle="Manage general team settings.">
+        <PageWithSubMenu subMenu={getTeamSettingsMenu({ team, showPaymentUI })} title="Settings" subtitle="Manage general team settings.">
             <h3>Delete Team</h3>
             <p className="text-base text-gray-500 pb-4 max-w-2xl">Deleting this team will also remove all associated data with this team, including projects and workspaces. Deleted teams cannot be restored!</p>
             <button className="danger secondary" onClick={() => setModal(true)}>Delete Team</button>
