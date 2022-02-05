@@ -32,6 +32,8 @@ require (
 	sigs.k8s.io/yaml v1.2.0
 )
 
+require github.com/pkg/errors v0.9.1
+
 require (
 	cloud.google.com/go v0.83.0 // indirect
 	cloud.google.com/go/storage v1.15.0 // indirect
@@ -164,7 +166,6 @@ require (
 	github.com/opencontainers/selinux v1.8.2 // indirect
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
-	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_golang v1.11.0 // indirect
 	github.com/prometheus/client_model v0.2.0 // indirect
@@ -223,12 +224,6 @@ require (
 )
 
 replace github.com/gitpod-io/gitpod/image-builder => ../components/image-builder-mk3 // leeway
-
-replace github.com/gitpod-io/gitpod/image-builder/api => ../components/image-builder-api/go // leeway
-
-replace github.com/gitpod-io/gitpod/openvsx-proxy => ../components/openvsx-proxy // leeway
-
-replace github.com/gitpod-io/gitpod/ws-proxy => ../components/ws-proxy // leeway
 
 replace github.com/gitpod-io/gitpod/agent-smith => ../components/ee/agent-smith // leeway
 
