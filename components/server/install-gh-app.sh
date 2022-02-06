@@ -9,7 +9,7 @@ rm server-config.yml server-config.yml.original
 
 # Pasting multi-line variable values into Gitpod replaces newlines with spaces
 # This turns spaces back into newlines
-echo 'fixing up $GH_APP_KEY'
+echo 'fixing up GH_APP_KEY'
 TMP=${GH_APP_KEY// RSA PRIVATE /_RSA_PRIVATE_}
 TMP2=${TMP// /$'\n'}
 GH_APP_KEY=${TMP2//_RSA_PRIVATE_/ RSA PRIVATE }
