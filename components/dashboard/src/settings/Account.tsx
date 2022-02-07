@@ -17,6 +17,7 @@ import { PaymentContext } from "../payment-context";
 export default function Account() {
     const { user } = useContext(UserContext);
     const { showPaymentUI } = useContext(PaymentContext);
+    console.log('showPaymentUI', showPaymentUI);
 
     const [modal, setModal] = useState(false);
     const [typedEmail, setTypedEmail] = useState('');
