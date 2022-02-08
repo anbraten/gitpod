@@ -12,6 +12,7 @@ import React, { Suspense, useEffect } from "react";
 import { v4 } from 'uuid';
 import Arrow from "../components/Arrow";
 import ContextMenu from "../components/ContextMenu";
+import Modal from "../components/Modal";
 import PendingChangesDropdown from "../components/PendingChangesDropdown";
 import { watchHeadlessLogs } from "../components/PrebuildLogs";
 import { getGitpodService, gitpodHostUrl } from "../service/service";
@@ -21,7 +22,42 @@ const sessionId = v4();
 const WorkspaceLogs = React.lazy(() => import('../components/WorkspaceLogs'));
 
 export interface StartWorkspaceProps {
-  workspaceId: string;
+  workspaceId: string,
+  parameters?: StartWorkspaceParameters,
+}
+
+export interface StartWorkspaceParameters {
+  trigger?: StartWorkspaceTrigger,
+}
+
+const StartWorkspaceTriggers = {
+  /**
+   * A workspace cluster redirected the client to "/start/#<wsId>" because it could not find that workspace
+   */
+  "redirect_from_ws_cluster": undefined,
+};
+export type StartWorkspaceTrigger = keyof (typeof StartWorkspaceTriggers);
+
+export namespace StartWorkspaceParameters {
+  export function parse(search: string): StartWorkspaceParameters | undefined {
+    try {
+      const result: StartWorkspaceParameters = {};
+      const params = new URLSearchParams(search);
+      for (const [k, v] of params.entries()) {
+        switch (k) {
+          case "trigger":
+            if (v in StartWorkspaceTriggers) {
+              result.trigger = v as StartWorkspaceTrigger;
+            }
+            break;
+        }
+      }
+      return result;
+    } catch (err) {
+      console.error("/start: error parsing search params", err);
+      return undefined;
+    }
+  }
 }
 
 export interface StartWorkspaceState {
@@ -34,8 +70,9 @@ export interface StartWorkspaceState {
     link: string
     label: string
     clientID?: string
-  }
-  ideOptions?: IDEOptions
+  };
+  ideOptions?: IDEOptions;
+  showRestartModal?: boolean;
 }
 
 export default class StartWorkspace extends React.Component<StartWorkspaceProps, StartWorkspaceState> {
@@ -75,8 +112,20 @@ export default class StartWorkspace extends React.Component<StartWorkspaceProps,
       this.setState({ error });
     }
 
+    // we're coming back from a workspace cluster where we expected a workspace to be running but it wasn't because either:
+    //  - this is a (very) old tab and the workspace already timed out
+    //  - due to a start error our workspace terminated very quickly between a) us being redirected to that workspace
+    //    cluster (based on the first ws-manager update) and b) our requests being validated by ws-proxy
+    // we break this potentially DDOS cycle by showing a modal.
+    if (this.props.parameters?.trigger === "redirect_from_ws_cluster") {
+      // so we can display workspace-related info
+      getGitpodService().server.getWorkspace(this.props.workspaceId)
+        .then(info => this.setState({ workspace: info.workspace }));
+      this.setState({ showRestartModal: true });
+      return;
+    }
+
     this.startWorkspace();
-    getGitpodService().server.getIDEOptions().then(ideOptions => this.setState({ ideOptions }))
   }
 
   componentWillUnmount() {
@@ -138,6 +187,9 @@ export default class StartWorkspace extends React.Component<StartWorkspaceProps,
       // Explicitly query state to guarantee we get at least one update
       // (needed for already started workspaces, and not hanging in 'Starting ...' for too long)
       this.fetchWorkspaceInfo();
+
+      // query IDE options so we can show them if necessary once the workspace is running
+      getGitpodService().server.getIDEOptions().then(ideOptions => this.setState({ ideOptions }));
     } catch (error) {
       console.error(error);
       if (typeof error === 'string') {
@@ -266,13 +318,20 @@ export default class StartWorkspace extends React.Component<StartWorkspaceProps,
   }
 
   render() {
-    const { error } = this.state;
+    const { error, showRestartModal } = this.state;
     const isHeadless = this.state.workspace?.type !== 'regular';
     const isPrebuilt = WithPrebuild.is(this.state.workspace?.context);
     let phase = StartPhase.Preparing;
     let title = undefined;
     let statusMessage = !!error ? undefined : <p className="text-base text-gray-400">Preparing workspace …</p>;
     const contextURL = this.state.workspace?.context.normalizedContextURL || ContextURL.parseToURL(this.state.workspace?.contextURL)?.toString();
+
+    if (!!showRestartModal) {
+      return RestartWorkspaceModal(this.state.workspace, () => {
+        this.setState({ showRestartModal: false });
+        this.startWorkspace(true);
+      });
+    }
 
     switch (this.state?.workspaceInstance?.status.phase) {
       // unknown indicates an issue within the system in that it cannot determine the actual phase of
@@ -506,4 +565,24 @@ function HeadlessWorkspaceView(props: { instanceId: string }) {
       <WorkspaceLogs logsEmitter={logsEmitter} />
     </Suspense>
   </StartPage>;
+}
+
+function RestartWorkspaceModal(workspace: Workspace | undefined, onStart: () => void) {
+  return <Modal visible={true} closeable={false} onClose={() => {}}>
+    <h3 className="flex">
+      <span className="flex-grow">Restart workspace?</span>
+    </h3>
+    <div className="border-t border-b border-gray-200 dark:border-gray-800 mt-4 -mx-6 px-6 py-2">
+      <a onClick={onStart} className="rounded-xl group hover:bg-gray-100 dark:hover:bg-gray-800 flex p-3 my-1">
+        <div className="w-full">
+          <p className="text-base text-black dark:text-gray-100 font-bold">{workspace?.id}</p>
+          <p className="truncate" title={workspace?.contextURL}>{workspace?.contextURL}</p>
+        </div>
+      </a>
+    </div>
+    <div className="flex justify-end mt-6">
+      <a href={gitpodHostUrl.asDashboard().toString()}><button className="secondary">Go to Dashboard</button></a>
+      <a onClick={onStart} className="ml-2"><button>Restart</button></a>
+    </div>
+  </Modal>;
 }

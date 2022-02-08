@@ -25,6 +25,7 @@ import { Experiment } from './experiments';
 import { workspacesPathMain } from './workspaces/workspaces.routes';
 import { settingsPathAccount, settingsPathIntegrations, settingsPathMain, settingsPathNotifications, settingsPathPlans, settingsPathPreferences, settingsPathTeams, settingsPathTeamsJoin, settingsPathTeamsNew, settingsPathVariables } from './settings/settings.routes';
 import { projectsPathInstallGitHubApp, projectsPathMain, projectsPathMainWithParams, projectsPathNew } from './projects/projects.routes';
+import { StartWorkspaceParameters } from './start/StartWorkspace';
 
 const Setup = React.lazy(() => import(/* webpackPrefetch: true */ './Setup'));
 const Workspaces = React.lazy(() => import(/* webpackPrefetch: true */ './workspaces/Workspaces'));
@@ -401,7 +402,8 @@ function App() {
     } else if (isCreation) {
         toRender = <CreateWorkspace contextUrl={hash} />;
     } else if (isWsStart) {
-        toRender = <StartWorkspace workspaceId={hash} />;
+        const params = StartWorkspaceParameters.parse(window.location.search);
+        toRender = <StartWorkspace workspaceId={hash} parameters={params} />;
     } else if (/^(github|gitlab)\.com\/.+?/i.test(window.location.pathname)) {
         let url = new URL(window.location.href)
         url.hash = url.pathname
