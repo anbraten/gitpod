@@ -141,7 +141,7 @@ export function WorkspaceEntry({ desc, model, isAdmin, stopWorkspace }: Props) {
         </ItemField>
         <ItemField className="w-4/12 flex flex-col my-auto">
             <div className="text-gray-500 dark:text-gray-400 overflow-ellipsis truncate">{workspaceDescription}</div>
-            <a href={ContextURL.parseToURL(ws.contextURL)?.toString()}>
+            <a href={ContextURL.getNormalized(ws)}>
                 <div className="text-sm text-gray-400 dark:text-gray-500 overflow-ellipsis truncate hover:text-blue-600 dark:hover:text-blue-400">{ws.contextURL}</div>
             </a>
         </ItemField>
