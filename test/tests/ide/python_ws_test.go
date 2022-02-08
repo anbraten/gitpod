@@ -18,6 +18,7 @@ import (
 
 	agent "github.com/gitpod-io/gitpod/test/pkg/agent/workspace/api"
 	"github.com/gitpod-io/gitpod/test/pkg/integration"
+	"github.com/google/uuid"
 )
 
 func poolTask(task func() (bool, error)) (bool, error) {
@@ -51,9 +52,15 @@ func TestPythonExtWorkspace(t *testing.T) {
 				api.Done(t)
 			})
 
-			username = "integration_test_user"
-			userId := "integration_test_user_id_123456"
-			err := api.CreateUser(username, userId, "")
+			userUuid, err := uuid.NewRandom()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			username = "integrationTestUser"
+			userId := userUuid.String()
+
+			err = api.CreateUser(username, userId, "")
 			if err != nil {
 				t.Fatal(err)
 			}
