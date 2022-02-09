@@ -43,7 +43,6 @@ import (
 	"github.com/gitpod-io/gitpod/common-go/analytics"
 	"github.com/gitpod-io/gitpod/common-go/log"
 	"github.com/gitpod-io/gitpod/common-go/pprof"
-	"github.com/gitpod-io/gitpod/common-go/process"
 	csapi "github.com/gitpod-io/gitpod/content-service/api"
 	"github.com/gitpod-io/gitpod/content-service/pkg/executor"
 	"github.com/gitpod-io/gitpod/content-service/pkg/initializer"
@@ -334,7 +333,7 @@ func Run(options ...RunOption) {
 			cmd.Stdout = os.Stdout
 			cmd.Stderr = os.Stderr
 			err := cmd.Run()
-			if err != nil && !process.IsNotChildProcess(err) {
+			if err != nil {
 				log.WithError(err).Error("git fetch error")
 			}
 		}()
@@ -725,7 +724,7 @@ func launchIDE(cfg *Config, ideConfig *IDEConfig, cmd *exec.Cmd, ideStopped chan
 		}()
 
 		err = cmd.Wait()
-		if err != nil && !(strings.Contains(err.Error(), "signal: interrupt") || strings.Contains(err.Error(), "wait: no child processes")) {
+		if err != nil {
 			log.WithField("ide", ide.String()).WithError(err).Warn("IDE was stopped")
 
 			ideWasReady, _ := ideReady.Get()
